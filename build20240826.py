@@ -6,7 +6,7 @@ class BuildGDB:
         self.uri = uri
         self.user = user
         self.password = pwd
-        self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
+        self.driver = GraphDatabase.driver(f"{self.uri}/neo4j", auth=(self.user, self.password))
         self.roman_numerals = {  
             # 1: 'I',  
             2: 'II',  
