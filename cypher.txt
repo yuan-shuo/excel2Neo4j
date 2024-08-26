@@ -1,0 +1,18 @@
+// 建立投影
+CALL gds.graph.project(  
+  'myGraph',  
+  '*',  // 包含所有节点标签  
+  '*'   // 包含所有关系类型  
+)  
+YIELD graphName, nodeCount, relationshipCount;
+
+// Node2Vec分析
+CALL gds.node2vec.stream('myGraph', {embeddingDimension: 2})
+YIELD nodeId, embedding
+RETURN nodeId, gds.util.asNode(nodeId).rockClassification AS nodeName, embedding
+
+// 删除投影
+CALL gds.graph.drop('myGraph')
+YIELD graphName
+RETURN 'Graph dropped: ' + graphName;
+
