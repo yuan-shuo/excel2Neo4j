@@ -36,6 +36,9 @@ class BuildGDB:
         # 链接分级节点和所有节点
         # self.connect_nodes_by_normal_numeral()
 
+        # 链接所有holeID节点，两两相连
+        self.connect_hole_nodes()
+
         # 关闭链接
         self.close()
 
@@ -71,6 +74,8 @@ class BuildGDB:
                         {"hole_id_value": int(hole_id)}
                     )
 
+                    sum_time = self.sum_values_of_key(features_list, "time")
+
                     for dicf in features_list:
                         # create_node_query = (
                         #     f"CREATE (:{self.roman_numerals[classification_value]} {{properties}})"
@@ -90,14 +95,24 @@ class BuildGDB:
                         res1 = session.run(create_node_query, dicf).data()[0]["NodeID"]
 
                         # print(f"res1={res1}")
-
+                        depth_f = dicf["depth"]
+                        time_f = dicf["time"]
                         # 连接Hole节点和Feature节点
+                        weight = time_f / sum_time # 假设weight的值为时间占比
                         session.run(
                             "MATCH (h:Hole), (f) "
                             "WHERE h.hole_id = $hole_node_id AND f.id = $feature_node_id "
-                            "CREATE (h)-[:HAS_FEATURE]->(f)",
-                            {"hole_node_id": hole_id, "feature_node_id": res1}
+                            "WITH h, f, $weight AS weightVar "
+                            "CREATE (h)-[r:HAS_FEATURE { weight: weightVar }]->(f) "
+                            "RETURN r",
+                            {"hole_node_id": hole_id, "feature_node_id": res1, "weight": weight}
                         )
+                        # session.run(
+                        #     "MATCH (h:Hole), (f) "
+                        #     "WHERE h.hole_id = $hole_node_id AND f.id = $feature_node_id "
+                        #     "CREATE (h)-[:HAS_FEATURE]->(f)",
+                        #     {"hole_node_id": hole_id, "feature_node_id": res1}
+                        # )
 
     def read_excel_and_create_nodes(self, file_path: str, classification_value: int, excelRow=None):
         # 读取Excel文件
@@ -128,6 +143,41 @@ class BuildGDB:
 
         print("Nodes have been connected based on normalNumeral values.")
 
+    def sum_values_of_key(self, features_list, key):
+        total_sum = 0
+        for feature_dict in features_list:
+            if key in feature_dict:  # 检查键是否存在于字典中
+                total_sum += feature_dict[key]  # 累加该键对应的值
+        return total_sum
+    
+    def connect_hole_nodes(self):
+        # 获取图谱会话
+        with self.driver.session() as session:
+            # 获取所有holeID
+            all_hole_ids = list(self.holeIDdic.keys())
+            
+            # 遍历holeID的组合
+            for i in range(len(all_hole_ids)):
+                # for j in range(i + 1, len(all_hole_ids)):
+                for j in range(len(all_hole_ids)):
+                    if i != j:
+                        # 获取两个holeID
+                        hole_id1 = all_hole_ids[i]
+                        hole_id2 = all_hole_ids[j]
+                        
+                        # 构建查询语句，找到两个节点并创建边
+                        query = """
+                        MATCH (h1:Hole {hole_id: $hole_id1}), (h2:Hole {hole_id: $hole_id2})
+                        CREATE (h1)-[:CONNECTED { weight: 1 }]->(h2)
+                        """
+                        # 执行查询
+                        session.run(query, {"hole_id1": hole_id1, "hole_id2": hole_id2})
+
+        print("Hole nodes have been connected based on holeIDdic keys.")
+
+    # 然后在main函数或其他合适的地方调用这个函数
+    # self.connect_hole_nodes()
+    
     def transform_df_to_dict(self, df):
         # 确保holeID列存在，否则抛出错误
         if 'holeID' not in df.columns:
